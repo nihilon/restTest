@@ -39,42 +39,32 @@ public class StockFighterConnection {
 
     private final CloseableHttpClient httpClient;
 
-    private final String apiURL, venue;
+    private final String venueCode;
 
-    public StockFighterConnection(String apiURL, String venue) {
+    public StockFighterConnection(String venueCode) {
         logger.setLevel(Level.TRACE);
-        logger.info("BEGIN: Connection check");
+        logger.info("BEGIN: StockFighterConnection");
         logger.info("Set log level: TRACE");
 
-        this.apiURL = apiURL;
-        logger.debug("apiURL set to " + apiURL);
-
-        this.venue = venue;
-        logger.debug("Venue set: " + venue);
+        this.venueCode = venueCode;
+        logger.debug("Venue set: " + venueCode);
 
         httpClient = HttpClients.createDefault();
         logger.debug("Default httpClient set");
+
+        logger.debug("Performing connection checks...");
+        apiCheck();
+        venueCheck();
+        logger.debug("Connection checks complete");
     }
 
-    public Boolean apiCheck() {
-        URIBuilder uriBuilder = new URIBuilder();
-        URI apiURI = null;
-
-        try {
-            apiURI = uriBuilder.setScheme(scheme)
-                               .setHost(host)
-                               .setPath("/ob/api/heartbeat")
-                               .build();
-            logger.debug(apiURI.toString());
-        } catch (URISyntaxException e) {
-            e.printStackTrace();
-        }
-
-        HttpGet httpGet = new HttpGet(apiURL);
+    private Boolean apiCheck() {
+        HttpGet httpGet = new HttpGet(uriBuilder(URIType.API));
         CloseableHttpResponse response = null;
 
         try {
             response = httpClient.execute(httpGet);
+            logger.debug("API Response: " + response.toString());
         } catch (IOException ioe) {
             ioe.printStackTrace();
         }
@@ -83,26 +73,13 @@ public class StockFighterConnection {
                 response.getStatusLine().getStatusCode() == 200);
     }
 
-    public Boolean venueCheck() {
-        URIBuilder uriBuilder = new URIBuilder();
-        URI venueURI = null;
-
-        try {
-            venueURI = uriBuilder.setScheme(scheme)
-                                 .setHost(host)
-                                 .setPath("/ob/api/venues/" +
-                                          venue + "/heartbeat")
-                                 .build();
-            logger.debug(venueURI.toString());
-        } catch (URISyntaxException e) {
-            e.printStackTrace();
-        }
-
-        HttpGet httpGet = new HttpGet(venueURI);
+    private Boolean venueCheck() {
+        HttpGet httpGet = new HttpGet(uriBuilder(URIType.VENUE));
         CloseableHttpResponse response = null;
 
         try {
             response = httpClient.execute(httpGet);
+            logger.debug("Venue response " + response.toString());
         } catch (IOException ioe) {
             ioe.printStackTrace();
         }
@@ -111,7 +88,57 @@ public class StockFighterConnection {
                 response.getStatusLine().getStatusCode() == 200);
     }
 
-    private JsonObject convertResponseToJsonObject(HttpResponse httpResponse) {
+    private URI uriBuilder(URIType uriType) {
+        URIBuilder uriB = new URIBuilder();
+        URI uri = null;
+        String logMsgFormat = "StockFighterConnection.uriBuilder(%s): ";
+
+        try {
+            uri = uriB.setScheme(scheme).setHost(host).build();
+        } catch (URISyntaxException USE) {
+            USE.printStackTrace();
+        }
+
+        switch (uriType) {
+            case VENUE: // Venue URI
+                try {
+                    uri = uriB.setPath(PathPrefix.VENUE +
+                                       venueCode + "/" +
+                                       PathPostfix.HEARTBEAT)
+                              .build();
+                    logger.debug(String.format(logMsgFormat, URIType.VENUE) +
+                                 uri.toString());
+                } catch (URISyntaxException USE) {
+                    USE.printStackTrace();
+                }
+                return uri;
+            case API: // API top-level URI
+                try {
+                    uri = uriB.setPath(PathPrefix.API +
+                                       PathPostfix.HEARTBEAT)
+                              .build();
+                    logger.debug(String.format(logMsgFormat, URIType.API) +
+                                 uri.toString());
+                } catch (URISyntaxException USE) {
+                    USE.printStackTrace();
+                }
+                return uri;
+            default:
+                // Defaults to API heartbeat URI
+                try {
+                    uri = uriB.setPath(PathPrefix.API +
+                                       PathPostfix.HEARTBEAT)
+                              .build();
+                    logger.debug(String.format(logMsgFormat, URIType.API) +
+                                 uri.toString());
+                } catch (URISyntaxException USE) {
+                    USE.printStackTrace();
+                }
+                return uri;
+        }
+    }
+
+    private JsonObject convertResponseContentToJson(HttpResponse httpResponse) {
         StringWriter writer = new StringWriter();
         try {
             IOUtils.copy(httpResponse.getEntity().getContent(),
@@ -126,5 +153,19 @@ public class StockFighterConnection {
         logger.debug("Response content: " + jsonObject.toString());
 
         return jsonObject;
+    }
+
+    private enum URIType {
+        VENUE,
+        API
+    }
+
+    private class PathPrefix {
+        public static final String API   = "/ob/api/";
+        public static final String VENUE = "/ob/api/venues/";
+    }
+
+    private class PathPostfix {
+        public static final String HEARTBEAT = "heartbeat";
     }
 }

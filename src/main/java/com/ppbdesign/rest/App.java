@@ -15,12 +15,6 @@ public class App {
 
         String apiURL = "https://api.stockfighter.io/ob/api/heartbeat";
         StockFighterConnection stockFighterConnection =
-                new StockFighterConnection(apiURL, "NYDEX");
-
-        logger.debug("StockFighter API running: " +
-                     stockFighterConnection.apiCheck());
-
-        logger.debug("StockFighter venue available: " +
-                     stockFighterConnection.venueCheck());
+                new StockFighterConnection("ELSPEX");
     }
 }
