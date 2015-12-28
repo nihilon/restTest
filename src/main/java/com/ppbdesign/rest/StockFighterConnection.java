@@ -9,6 +9,11 @@ package com.ppbdesign.rest;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import org.apache.commons.io.IOUtils;
+import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.CloseableHttpClient;
@@ -17,20 +22,21 @@ import org.joda.time.DateTime;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.io.StringWriter;
 import java.util.Arrays;
 
-public class HttpStatusCheck {
+public class StockFighterConnection {
     private final DateTime instanceLoadTime = new DateTime();
     private final Logger   logger           =
             (Logger) LoggerFactory.getLogger("com.ppbdesign.rest" +
                                              ".ConnectionCheck" +
                                              instanceLoadTime.toString());
 
-    private final CloseableHttpClient   httpClient;
-    private final HttpGet               httpGet;
-    private final CloseableHttpResponse response;
+    private final CloseableHttpClient httpClient;
+    private final HttpGet             httpGet;
+    private final JsonObject          response;
 
-    public HttpStatusCheck(String connectionURL) {
+    public StockFighterConnection(String connectionURL) {
         logger.setLevel(Level.TRACE);
         logger.info("BEGIN: CheckConnection");
         logger.info("Set CheckConnection log level: TRACE");
@@ -47,7 +53,7 @@ public class HttpStatusCheck {
         response = getResponse();
     }
 
-    private CloseableHttpResponse getResponse() {
+    private JsonObject getResponse() {
         try {
             CloseableHttpResponse response = httpClient.execute(httpGet);
             if (response == null) {
@@ -55,17 +61,28 @@ public class HttpStatusCheck {
             } else {
                 logger.debug("Success");
                 logger.debug("Response: " + response.toString());
-                logger.debug("Response status line: " +
-                             response.getStatusLine());
-            }
 
-            httpClient.close();
-            logger.debug("HttpClient closed");
+                return convertResponseToJsonObject(response);
+            }
         } catch (IOException IOE) {
             logger.error(Arrays.toString(IOE.getStackTrace()));
         } catch (NullPointerException NPE) {
             logger.error(Arrays.toString(NPE.getStackTrace()));
         }
-        return response;
+
+        return null;
+    }
+
+    private JsonObject convertResponseToJsonObject(HttpResponse httpResponse)
+            throws IOException {
+        StringWriter writer = new StringWriter();
+        IOUtils.copy(httpResponse.getEntity().getContent(),
+                     writer);
+
+        JsonElement jsonElement = new JsonParser().parse(writer.toString());
+        JsonObject jsonObject = jsonElement.getAsJsonObject();
+        logger.debug("Response content: " + jsonObject.toString());
+
+        return jsonObject;
     }
 }
