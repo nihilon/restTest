@@ -15,6 +15,8 @@ public class App {
 
         String apiURL = "https://api.stockfighter.io/ob/api/heartbeat";
         StockFighterConnection stockFighterConnection =
-                new StockFighterConnection("ELSPEX");
+                new StockFighterConnection("KNOEX");
+
+        logger.debug(stockFighterConnection.getStocks().toString());
     }
 }

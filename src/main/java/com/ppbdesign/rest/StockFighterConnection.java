@@ -37,8 +37,6 @@ public class StockFighterConnection {
                                              ".StockFighterConnection" +
                                              instanceLoadTime.toString());
 
-    private final CloseableHttpClient httpClient;
-
     private final String venueCode;
 
     public StockFighterConnection(String venueCode) {
@@ -49,22 +47,45 @@ public class StockFighterConnection {
         this.venueCode = venueCode;
         logger.debug("Venue set: " + venueCode);
 
-        httpClient = HttpClients.createDefault();
-        logger.debug("Default httpClient set");
-
         logger.debug("Performing connection checks...");
         apiCheck();
         venueCheck();
         logger.debug("Connection checks complete");
     }
 
+    public JsonObject getStocks() {
+        HttpGet httpGet = new HttpGet(uriBuilder(URIType.STOCKS));
+        logger.debug("Instantiating CloseableHttpClient");
+        CloseableHttpClient httpClient = HttpClients.createDefault();
+        CloseableHttpResponse response = null;
+        JsonObject convertedResponse = null;
+
+        try {
+            response = httpClient.execute(httpGet);
+            logger.debug("STOCKS Response: " + response.toString());
+            /* Any response data needed must be cached/stored prior to closing
+             the connection*/
+            convertedResponse = convertResponseContentToJson(response);
+            logger.debug("Closing connection...");
+            httpClient.close();
+        } catch (IOException ioe) {
+            ioe.printStackTrace();
+        }
+
+        return convertedResponse;
+    }
+
     private Boolean apiCheck() {
         HttpGet httpGet = new HttpGet(uriBuilder(URIType.API));
+        logger.debug("Instantiating CloseableHttpClient");
+        CloseableHttpClient httpClient = HttpClients.createDefault();
         CloseableHttpResponse response = null;
 
         try {
             response = httpClient.execute(httpGet);
             logger.debug("API Response: " + response.toString());
+            logger.debug("Closing connection...");
+            httpClient.close();
         } catch (IOException ioe) {
             ioe.printStackTrace();
         }
@@ -75,11 +96,15 @@ public class StockFighterConnection {
 
     private Boolean venueCheck() {
         HttpGet httpGet = new HttpGet(uriBuilder(URIType.VENUE));
+        logger.debug("Instantiating CloseableHttpClient");
+        CloseableHttpClient httpClient = HttpClients.createDefault();
         CloseableHttpResponse response = null;
 
         try {
             response = httpClient.execute(httpGet);
             logger.debug("Venue response " + response.toString());
+            logger.debug("Closing connection...");
+            httpClient.close();
         } catch (IOException ioe) {
             ioe.printStackTrace();
         }
@@ -123,6 +148,18 @@ public class StockFighterConnection {
                     USE.printStackTrace();
                 }
                 return uri;
+            case STOCKS:
+                try {
+                    uri = uriB.setPath(PathPrefix.VENUE +
+                                       venueCode + "/" +
+                                       PathPostfix.STOCKS)
+                              .build();
+                    logger.debug(String.format(logMsgFormat, URIType.STOCKS) +
+                                 uri.toString());
+                } catch (URISyntaxException USE) {
+                    USE.printStackTrace();
+                }
+                return uri;
             default:
                 // Defaults to API heartbeat URI
                 try {
@@ -157,7 +194,8 @@ public class StockFighterConnection {
 
     private enum URIType {
         VENUE,
-        API
+        API,
+        STOCKS
     }
 
     private class PathPrefix {
@@ -167,5 +205,6 @@ public class StockFighterConnection {
 
     private class PathPostfix {
         public static final String HEARTBEAT = "heartbeat";
+        public static final String STOCKS = "stocks";
     }
 }
