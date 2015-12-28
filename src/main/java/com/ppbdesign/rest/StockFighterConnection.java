@@ -16,6 +16,7 @@ import org.apache.commons.io.IOUtils;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.utils.URIBuilder;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.joda.time.DateTime;
@@ -23,61 +24,102 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.StringWriter;
-import java.util.Arrays;
+import java.net.URI;
+import java.net.URISyntaxException;
 
 public class StockFighterConnection {
+    private final String scheme = "http";
+    private final String host   = "api.stockfighter.io";
+
     private final DateTime instanceLoadTime = new DateTime();
     private final Logger   logger           =
             (Logger) LoggerFactory.getLogger("com.ppbdesign.rest" +
-                                             ".ConnectionCheck" +
+                                             ".StockFighterConnection" +
                                              instanceLoadTime.toString());
 
     private final CloseableHttpClient httpClient;
-    private final HttpGet             httpGet;
-    private final JsonObject          response;
 
-    public StockFighterConnection(String connectionURL) {
+    private final String apiURL, venue;
+
+    public StockFighterConnection(String apiURL, String venue) {
         logger.setLevel(Level.TRACE);
-        logger.info("BEGIN: CheckConnection");
-        logger.info("Set CheckConnection log level: TRACE");
+        logger.info("BEGIN: Connection check");
+        logger.info("Set log level: TRACE");
 
-        logger.debug("connectionURL set to " + connectionURL);
+        this.apiURL = apiURL;
+        logger.debug("apiURL set to " + apiURL);
+
+        this.venue = venue;
+        logger.debug("Venue set: " + venue);
 
         httpClient = HttpClients.createDefault();
         logger.debug("Default httpClient set");
-
-        httpGet = new HttpGet(connectionURL);
-        logger.info("HTTP GET called on " + connectionURL + ". Attempting to " +
-                    "get response...");
-
-        response = getResponse();
     }
 
-    private JsonObject getResponse() {
-        try {
-            CloseableHttpResponse response = httpClient.execute(httpGet);
-            if (response == null) {
-                throw new NullPointerException("Response is null!");
-            } else {
-                logger.debug("Success");
-                logger.debug("Response: " + response.toString());
+    public Boolean apiCheck() {
+        URIBuilder uriBuilder = new URIBuilder();
+        URI apiURI = null;
 
-                return convertResponseToJsonObject(response);
-            }
-        } catch (IOException IOE) {
-            logger.error(Arrays.toString(IOE.getStackTrace()));
-        } catch (NullPointerException NPE) {
-            logger.error(Arrays.toString(NPE.getStackTrace()));
+        try {
+            apiURI = uriBuilder.setScheme(scheme)
+                               .setHost(host)
+                               .setPath("/ob/api/heartbeat")
+                               .build();
+            logger.debug(apiURI.toString());
+        } catch (URISyntaxException e) {
+            e.printStackTrace();
         }
 
-        return null;
+        HttpGet httpGet = new HttpGet(apiURL);
+        CloseableHttpResponse response = null;
+
+        try {
+            response = httpClient.execute(httpGet);
+        } catch (IOException ioe) {
+            ioe.printStackTrace();
+        }
+
+        return (response != null &&
+                response.getStatusLine().getStatusCode() == 200);
     }
 
-    private JsonObject convertResponseToJsonObject(HttpResponse httpResponse)
-            throws IOException {
+    public Boolean venueCheck() {
+        URIBuilder uriBuilder = new URIBuilder();
+        URI venueURI = null;
+
+        try {
+            venueURI = uriBuilder.setScheme(scheme)
+                                 .setHost(host)
+                                 .setPath("/ob/api/venues/" +
+                                          venue + "/heartbeat")
+                                 .build();
+            logger.debug(venueURI.toString());
+        } catch (URISyntaxException e) {
+            e.printStackTrace();
+        }
+
+        HttpGet httpGet = new HttpGet(venueURI);
+        CloseableHttpResponse response = null;
+
+        try {
+            response = httpClient.execute(httpGet);
+        } catch (IOException ioe) {
+            ioe.printStackTrace();
+        }
+
+        return (response != null &&
+                response.getStatusLine().getStatusCode() == 200);
+    }
+
+    private JsonObject convertResponseToJsonObject(HttpResponse httpResponse) {
         StringWriter writer = new StringWriter();
-        IOUtils.copy(httpResponse.getEntity().getContent(),
-                     writer);
+        try {
+            IOUtils.copy(httpResponse.getEntity().getContent(),
+                         writer);
+        } catch (IOException e) {
+            logger.error(e.getMessage());
+            e.printStackTrace();
+        }
 
         JsonElement jsonElement = new JsonParser().parse(writer.toString());
         JsonObject jsonObject = jsonElement.getAsJsonObject();
