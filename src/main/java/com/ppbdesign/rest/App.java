@@ -12,11 +12,6 @@ public class App {
 
     public static void main(String[] args) throws IOException {
         logger.setLevel(Level.TRACE);
-
-        String apiURL = "https://api.stockfighter.io/ob/api/heartbeat";
-        StockFighterConnection stockFighterConnection =
-                new StockFighterConnection("KNOEX");
-
-        logger.debug(stockFighterConnection.getStocks().toString());
+        VenuesAndStocks venuesAndStocks = new VenuesAndStocks();
     }
 }
